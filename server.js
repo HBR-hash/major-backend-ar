@@ -7,47 +7,43 @@ const rateLimit = require('express-rate-limit');
 const authRoutes = require('./routes/auth');
 
 const app = express();
-
-// Middleware
 app.use(express.json());
 app.use(helmet());
 app.use(cors({ origin: '*' }));
 
-// Basic rate limiter
 const limiter = rateLimit({
-    windowMs: 60 * 1000, // 1 minute
-    max: 30, // limit each IP to 30 requests per minute
+    windowMs: 60 * 1000,
+    max: 30
 });
 app.use(limiter);
+
+// ✅ Simple health route for Railway check
+app.get('/', (req, res) => {
+    res.json({ status: 'ok', message: 'Backend running 🚀' });
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
 
-// ✅ Root route for Railway health check
-app.get('/', (req, res) => {
-    res.json({ message: 'Backend running successfully 🚀' });
-});
-
 const PORT = process.env.PORT || 8080;
 
-// ✅ Important for Railway: bind to 0.0.0.0
 async function start() {
-    try {
-        const mongoUri = process.env.MONGO_URI;
-        if (!mongoUri) throw new Error('MONGO_URI missing in env');
+    console.log('🚀 Starting backend...');
+    console.log('📡 Using Mongo URI:', process.env.MONGO_URI ? 'Found ✅' : 'Missing ❌');
+    console.log('🌍 Port:', PORT);
 
-        await mongoose.connect(mongoUri, {
+    try {
+        await mongoose.connect(process.env.MONGO_URI, {
             useNewUrlParser: true,
             useUnifiedTopology: true,
         });
-
         console.log('✅ Connected to MongoDB');
+
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server running on port ${PORT}`);
         });
     } catch (err) {
-        console.error('❌ Failed to start server:', err);
-        process.exit(1);
+        console.error('❌ Failed to start server:', err.message);
     }
 }
 
