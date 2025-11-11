@@ -23,7 +23,7 @@ app.get('/', (req, res) => {
 });
 
 // Routes
-app.use('/api/auth', authRoutes);
+//app.use('/api/auth', authRoutes);
 
 const PORT = process.env.PORT || 8080;
 
@@ -41,7 +41,9 @@ async function start() {
 
         app.listen(PORT, '0.0.0.0', () => {
             console.log(`🚀 Server running on port ${PORT}`);
+            console.log(`✅ Listening on: http://0.0.0.0:${PORT}`);
         });
+
     } catch (err) {
         console.error('❌ Failed to start server:', err.message);
     }
