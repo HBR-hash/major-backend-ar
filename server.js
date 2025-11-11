@@ -7,6 +7,9 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
+// ✅ Trust Railway proxy to fix express-rate-limit & 500 errors
+app.set('trust proxy', 1);
+
 // ========== MIDDLEWARE ==========
 app.use(express.json());
 app.use(helmet());
@@ -14,8 +17,8 @@ app.use(cors({ origin: '*' }));
 
 // ========== RATE LIMIT ==========
 const limiter = rateLimit({
-    windowMs: 60 * 1000,
-    max: 30
+    windowMs: 60 * 1000, // 1 minute
+    max: 30,
 });
 app.use(limiter);
 
@@ -24,7 +27,12 @@ app.get('/', (req, res) => {
     res.status(200).json({ status: 'ok', message: 'Backend is alive 🚀' });
 });
 
-// ========== ROUTES (load safely) ==========
+// ✅ Add a base API route to verify Railway easily
+app.get('/api', (req, res) => {
+    res.status(200).json({ message: 'API running successfully ✅' });
+});
+
+// ========== ROUTES ==========
 try {
     const authRoutes = require('./routes/auth');
     app.use('/api/auth', authRoutes);
