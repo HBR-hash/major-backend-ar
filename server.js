@@ -7,7 +7,7 @@ const rateLimit = require('express-rate-limit');
 
 const app = express();
 
-// ✅ Trust Railway proxy to fix express-rate-limit & 500 errors
+// ✅ Trust Railway proxy (fixes rate-limit + X-Forwarded-For issues)
 app.set('trust proxy', 1);
 
 // ========== MIDDLEWARE ==========
@@ -22,12 +22,17 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// ========== HEALTH CHECK ==========
+// ========== HEALTH CHECK (MUST BE FIRST!) ==========
+// ✅ Railway health check endpoint - responds immediately, no DB needed
+app.get('/health', (req, res) => {
+    res.status(200).send('OK');
+});
+
 app.get('/', (req, res) => {
     res.status(200).json({ status: 'ok', message: 'Backend is alive 🚀' });
 });
 
-// ✅ Add a base API route to verify Railway easily
+// ✅ For verifying Railway deployment
 app.get('/api', (req, res) => {
     res.status(200).json({ message: 'API running successfully ✅' });
 });
@@ -44,26 +49,37 @@ try {
 // ========== START SERVER ==========
 const PORT = process.env.PORT || 8080;
 
-async function start() {
-    console.log('🚀 Starting backend...');
-    console.log('📡 Mongo URI:', process.env.MONGO_URI ? 'Found ✅' : 'Missing ❌');
-    console.log('🌍 Port:', PORT);
+console.log('🚀 Starting backend...');
+console.log('📡 Mongo URI:', process.env.MONGO_URI ? 'Found ✅' : 'Missing ❌');
+console.log('🌍 Port:', PORT);
 
-    try {
-        await mongoose.connect(process.env.MONGO_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
+// ✅ START SERVER FIRST (so Railway healthcheck can reach it)
+const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`🌐 Listening on: http://0.0.0.0:${PORT}`);
+});
+
+// ✅ THEN connect to MongoDB in background (won't block server startup)
+mongoose.connect(process.env.MONGO_URI, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+    })
+    .then(() => {
         console.log('✅ Connected to MongoDB');
+    })
+    .catch(err => {
+        console.error('❌ MongoDB connection error:', err.message);
+        // Don't exit - server can still respond to healthchecks
+    });
 
-        app.listen(PORT, '0.0.0.0', () => {
-            console.log(`🚀 Server running on port ${PORT}`);
-            console.log(`🌐 Listening on: http://0.0.0.0:${PORT}`);
+// ✅ Graceful shutdown for Railway
+process.on('SIGTERM', () => {
+    console.log('⚠️ SIGTERM received, shutting down gracefully...');
+    server.close(() => {
+        console.log('✅ Server closed');
+        mongoose.connection.close(false, () => {
+            console.log('✅ MongoDB closed');
+            process.exit(0);
         });
-    } catch (err) {
-        console.error('❌ Failed to start server:', err.message);
-        process.exit(1);
-    }
-}
-
-start();
+    });
+});
